@@ -1,8 +1,26 @@
+import os
+from pprint import pprint
+
+from notion_client import Client
+
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    print("Could not load .env because python-dotenv not found.")
+else:
+    load_dotenv()
+
+NOTION_TOKEN = os.getenv("NOTION_TOKEN", "")
+
+while NOTION_TOKEN == "":
+    print("NOTION_TOKEN not found.")
+    NOTION_TOKEN = input("Enter your integration token: ").strip()
+
+
+
 
 from notion_client import Client
 from notion_client.helpers import get_id
-
-NOTION_TOKEN = "secret_CcumlCK9hiUuJW9Bb7tivCUeb1GaRa9XBHwDS5pqTnz"  # replace yours
 
 
 notion = Client(auth=NOTION_TOKEN)
@@ -134,70 +152,91 @@ def query_database_entries(database_id: str, filter: dict = None) -> list:
 
 
 
+def retrieve_page_content(page_id: str):
+    """
+    Retrieve the content of a Notion page using its page ID.
+
+    :param page_id: The ID of the page to retrieve.
+    :return: The content of the page as a list of strings.
+    """
+    content = []
+    block_children = notion.blocks.children.list(block_id=page_id)
+
+    # print(block_children)
+
+    for block in block_children.get("results", []):
+        block_type = block.get("type")
+        block_content = block.get(block_type, {})
+        # print(block_content)
+
+        if block_type == "paragraph":
+            text = ''.join([text.get("plain_text", "") for text in block_content.get("rich_text", [])])
+            content.append(text)
+
+        elif block_type in ["heading_1", "heading_2"]:
+            heading_text = ''.join([text.get("plain_text", "") for text in block_content.get("rich_text", [])])
+            heading_level = "##" if block_type == "heading_1" else "###"
+            content.append(f"{heading_level} {heading_text}")
+
+        elif block_type == "quote":
+            quote_text = ''.join([text.get("plain_text", "") for text in block_content.get("rich_text", [])])
+            content.append(f"> {quote_text}")
+
+        elif block_type == "bulleted_list_item":
+            bullets = ''.join([text.get("plain_text", "") for text in block_content.get("rich_text", [])])
+            content.append(f"- {bullets}")
+
+        elif block_type == "callout":
+            callout_text = ''.join([text.get("plain_text", "") for text in block_content.get("rich_text", [])])
+            emoji = block_content.get("icon", {}).get("emoji", "")
+            content.append(f"{emoji} {callout_text}")
+
+        # Additional block types can be added here
+    return content
+
+
+def add_text_block_to_page(page_id: str, text_content: str):
+    """
+    Add a new text block to a Notion page.
+
+    :param page_id: The ID of the page to update.
+    :param text_content: The text content to add to the page.
+    """
+    new_block = {
+        "object": "block",
+        "type": "paragraph",
+        "paragraph": {
+            "rich_text": [
+                {
+                    "type": "text",
+                    "text": {
+                        "content": text_content
+                    }
+                }
+            ]
+        }
+    }
+    notion.blocks.children.append(block_id=page_id, children=[new_block])
+
 
 if __name__ == "__main__":
-    # Create a new database
-    # parent_id, db_name = manual_inputs()
-    # new_db = create_database(parent_id=parent_id, db_name=db_name)
-    # print(f"\n\nDatabase {db_name} created at {new_db['url']}\n")
-
-    # Define the data for the new entry
-    entry_data = {
-        "Name": {
-            "title": [
-                {"text": {"content": "Sample Item4"}}
-            ]
-        },
-        "Description": {
-            "rich_text": [
-                {"text": {"content": "This is a sample description.26"}}
-            ]
-        },
-        "In stock": {
-            "checkbox": True
-        },
-        "Food group": {
-            "select": {
-                "name": "🥦 Vegetable36"
-            }
-        },
-        "Price": {
-            "number": 9
-        },
-        # "Last ordered" and "Store availability" are omitted for simplicity
-        # Include them as needed based on your database structure
-    }
 
     # Add the new entry to the database
     # database_id = new_db["id"]  # Get the ID of the newly created database
-    database_id = "9de8bdde58144a1390616d4066c8d51f"
+    # database_id = "d79c306dd89b4c5aa130eb8c8f6ea933"
 
-    new_entry = create_database_entry(database_id, entry_data)
-    print("New entry added:", new_entry)
+  
+#    Finding the Page ID
+    # entries = query_database_entries(database_id)
+    # for entry in entries:
+    #     print(entry)
+
+    page_id = "90fef77a0e2e48b59a4b3d0fac9e118a"  # The extracted page ID
+    page_content = retrieve_page_content(page_id)
+    # print(page_content)
+
+    page_content='hello world'
+
+    add_text_block_to_page(page_id,page_content)
 
 
-    #Finding the Page ID
-    entries = query_database_entries(database_id)
-    for entry in entries:
-        print(f"Entry Name: {entry['properties']['Name']['title'][0]['text']['content']}, Page ID: {entry['id']}")
-
-
-    # Updating an Entry
-    page_id_to_update = "33ce3a46-4528-45d4-88aa-20a4f93f8712"  # Replace with the actual page ID of the entry you want to update
-
-    updated_data = {
-        "Name": {
-            "title": [
-                {"text": {"content": "Updated Item Name"}}
-            ]
-        },
-        "Description": {
-            "rich_text": [
-                {"text": {"content": "Updated description."}}
-            ]
-        },
-        # Include other properties to update as needed
-    }
-
-    updated_entry = update_database_entry(page_id_to_update, updated_data)
-    print("Updated entry:", updated_entry)
