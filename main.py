@@ -2,6 +2,8 @@ import os
 from pprint import pprint
 
 from notion_client import Client
+from notion_client.helpers import get_id
+
 
 try:
     from dotenv import load_dotenv
@@ -17,16 +19,8 @@ while NOTION_TOKEN == "":
     NOTION_TOKEN = input("Enter your integration token: ").strip()
 
 
-
-
-from notion_client import Client
-from notion_client.helpers import get_id
-
-
 notion = Client(auth=NOTION_TOKEN)
-
 users = notion.users.list()
-
 for user in users.get("results"):
     name, user_type = user["name"], user["type"]
     emoji = "😅" if user["type"] == "bot" else "🙋‍♂️"
